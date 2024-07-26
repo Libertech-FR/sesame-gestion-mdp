@@ -41,7 +41,10 @@
         &nbsp; Complexité
         <br>
         <q-linear-progress :value="progress" :color="progress_color" class="q-mt-sm" size="10px" />
-
+      </p>
+      <p v-show="checkPwned">
+        <q-icon  :name="isPwned" :color="isPwned_color" size="xs" ></q-icon>
+        &nbsp; Exposition du mot de passe <a href="https://haveibeenpwned.com">haveiBeenPwned</a>
       </p>
     </div>
   </div>
@@ -70,7 +73,8 @@ const has_special=ref('highlight_off')
 const has_special_color=ref('red')
 const has_complexity=ref('highlight_off')
 const has_complexity_color=ref('red')
-
+const isPwned=ref('sentiment_satisfied')
+const isPwned_color=ref('grey')
 const progress=ref(0)
 const progress_color=ref('red')
 const typePasswordProp=ref('password')
@@ -97,15 +101,19 @@ const props = defineProps({
   },
   minEntropy:{
     type:Number,
-    default:50
+    default:30
   },
   entropyBad:{
     type:Number,
-    default:30
+    default:10
   },
   entropyGood:{
     type:Number,
     default:80
+  },
+  checkPwned:{
+    type:Boolean,
+    default:true
   }
 })
 
@@ -123,12 +131,16 @@ async function checkPassword(ev, type) {
       //avant d accepter on cherche dans l api de pwned
       try{
         const numPwns = await pwnedPassword(newP);
+
         if (numPwns >0){
+          iconIsPwnedOK(false)
           $q.notify({
             message: '<text-weight-medium>Ce mot de passe est déjà apparu lors d\'une violation de données. Vous ne pouvez pas l\'utiliser</text-weight-medium>',
           })
           emit('update:modelValue', '')
           return
+        }else{
+          iconIsPwnedOK(true)
         }
         console.log('pwn :' + numPwns)
       }catch(err){
@@ -254,23 +266,37 @@ function iconSpecialOK(value){
     has_special_color.value='red'
   }
 }
+function iconIsPwnedOK(value){
+  if (value === true){
+    isPwned.value='sentiment_satisfied'
+    isPwned_color.value='green'
+  }else{
+    isPwned.value='sentiment_very_dissatisfied'
+    isPwned_color.value='red'
+  }
+}
 function complexity(password){
   console.log(stringEntropy(password))
-  let c=stringEntropy(password)
-  progress.value=c/100
-  console.log('entropy' + c)
-  if (c < props.entropyBad){
-    progress_color.value='red'
-  }else if(c >=props.entropyBad && c< props.entropyGood){
-    progress_color.value='warning'
-  }else {
-    progress_color.value='green'
-  }
-  if (c >= props.minEntropy){
-    return true
+  if (props.checkPwned === true){
+    let c=stringEntropy(password)
+    progress.value=c/100
+    console.log('entropy' + c)
+    if (c < props.entropyBad){
+      progress_color.value='red'
+    }else if(c >=props.entropyBad && c< props.entropyGood){
+      progress_color.value='warning'
+    }else {
+      progress_color.value='green'
+    }
+    if (c >= props.minEntropy){
+      return true
+    }else{
+      return false
+    }
   }else{
-    return false
+    return true
   }
+
 
 }
 function togglePassword(){

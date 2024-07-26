@@ -28,7 +28,19 @@
       <div v-show="action == 'change'" class="row-md">
         <q-input v-model="username" label="Utilisateur" type="text"></q-input>
         <q-input v-model="oldpassword" label="Mot de passe" type="password"></q-input>
-        <input-new-password v-model="newpassword" :min-entropy=30 :min-upper=1 :min-lower=1 :min-number=1></input-new-password>
+        <input-new-password v-model="newpassword"
+                            :min="passwordPolicies.len"
+                            :min-upper="passwordPolicies.hasUpperCase"
+                            :min-lower="passwordPolicies.hasLowerCase"
+                            :min-number="passwordPolicies.hasNumbers"
+                            :min-special="passwordPolicies.hasSpecialChars"
+                            :min-entropy="passwordPolicies.minComplexity"
+                            :entropy-bad="passwordPolicies.minComplexity"
+                            :entropy-good="passwordPolicies.goodComplexity"
+                            :check-pwned="passwordPolicies.checkPwned"
+                            >
+
+        </input-new-password>
       </div>
       <div v-show="action == 'reset'" class="row-md">
         <div class="q-pa-md row-md">
@@ -92,7 +104,7 @@
 
 <script setup>
 import {ref} from 'vue'
-import {computed} from 'vue';
+import {computed,onMounted} from 'vue';
 
 
 const messageType = ref('bg-secondary')
@@ -108,9 +120,38 @@ const newpassword = ref('')
 const actionReset = ref('mail')
 const typeOfReset = ref('SMS')
 const code = ref('')
-const enableBySms = ref(true)
 const enableByMail = ref(true)
-
+const enableBySms = ref(true)
+const passwordPolicies=ref({
+  bannedTime:3600,
+  checkPwned:true,
+  goodComplexity:60,
+  hasLowerCase:1,
+  hasNumbers:1,
+  hasSpecialChars:1,
+  hasUpperCase:1,
+  len:10,
+  maxRetry:10,
+  minComplexity:20,
+  resetBySms:false,
+  redirectUrl: ''
+})
+onMounted(async ()=>{
+  const requestOptions = { method:'GET'}
+  let rep= await fetch('/management/passwd/getpolicies')
+  if (rep.status === 200){
+    let response =await rep.json();
+    passwordPolicies.value=response.data
+    enableBySms.value=passwordPolicies.value.resetBySms
+    debugger
+  }else{
+    messageAction.value = 'reloadPage'
+    messageText.value = 'Une erreur c est produite : ' + rep.status
+    messageType.value = 'bg-negative'
+    message.value = true
+  }
+  }
+)
 const enableValidation = computed(() => {
   if (action.value === 'change') {
     if (username.value !== '' &&
@@ -176,22 +217,19 @@ function envoi() {
         const data = isJson && await response.json();
         console.log('status :' + data.status)
         // check for error response
-        if (!response.ok) {
-          // get error message from body or default to response status
-          const error = (data && data.message) || response.status;
-          return Promise.reject(error);
-        } else {
-          if (data.status === 0) {
+        if (response.status === 200){
             messageAction.value = 'redirect'
             messageText.value = 'Votre mot de passe a été changé. Vous pouvez vous connecter'
             messageType.value = 'bg-secondary'
             message.value = true
-          } else {
+          } else if (response.status === 400){
             messageAction.value = 'reloadPage'
-            messageText.value = 'Une erreur c est produite. Veuillez réessayer.'
+            messageText.value = 'Erreur d\'authentification. Veuillez réessayer.'
             messageType.value = 'bg-negative'
             message.value = true
-          }
+          }else{
+          const error = (data && data.message) || response.status;
+          return Promise.reject(error);
         }
       })
       .catch(error => {
@@ -214,7 +252,7 @@ function doActionMessage() {
     window.location.reload()
   }
   if (messageAction.value === 'redirect') {
-    window.location.replace(process.env.REDIRECT_PAGE)
+      window.location.replace(passwordPolicies.value.redirectUrl )
   }
 }
 

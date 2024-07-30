@@ -86,17 +86,37 @@
   <q-dialog v-model="messageSms" persistent>
     <q-card style="min-width: 350px">
       <q-card-section>
-        <div class="text-h6">Saisissez le numéro reçu par {{ typeOfReset }}</div>
+        <div class="text-h5">Saisissez le code reçu par {{ typeOfReset }}</div>
       </q-card-section>
 
       <q-card-section  >
         <div class="row">
-          <q-input  class="input self-center" maxlength="5" mask="#####" style="width:100%;font-size: 30px" rounded outlined v-model="code" autofocus/>
         </div>
+        <div class="row">
+          <q-input  class="input self-center" maxlength="6" mask="######" style="width:100%;font-size: 30px" rounded outlined v-model="code" autofocus/>
+        </div>
+
+          <q-card-section>
+            <div class="text-h5">Définisez votre nouveau mot de passe</div>
+          </q-card-section>
+          <input-new-password v-model="newpassword"
+                              :min="passwordPolicies.len"
+                              :min-upper="passwordPolicies.hasUpperCase"
+                              :min-lower="passwordPolicies.hasLowerCase"
+                              :min-number="passwordPolicies.hasNumbers"
+                              :min-special="passwordPolicies.hasSpecialChars"
+                              :min-entropy="passwordPolicies.minComplexity"
+                              :entropy-bad="passwordPolicies.minComplexity"
+                              :entropy-good="passwordPolicies.goodComplexity"
+                              :check-pwned="passwordPolicies.checkPwned"
+          >
+
+          </input-new-password>
+
       </q-card-section>
       <q-card-actions align="right" class="text-primary">
         <q-btn @click="doReloadPage" flat label="Abandonner" v-close-popup/>
-        <q-btn flat label="Valider" v-close-popup/>
+        <q-btn @click="actionSendReset" flat label="Valider" v-close-popup/>
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -120,6 +140,7 @@ const newpassword = ref('')
 const actionReset = ref('mail')
 const typeOfReset = ref('SMS')
 const code = ref('')
+const resetToken=ref('')
 const enableByMail = ref(true)
 const enableBySms = ref(true)
 const passwordPolicies=ref({
@@ -143,7 +164,6 @@ onMounted(async ()=>{
     let response =await rep.json();
     passwordPolicies.value=response.data
     enableBySms.value=passwordPolicies.value.resetBySms
-    debugger
   }else{
     messageAction.value = 'reloadPage'
     messageText.value = 'Une erreur c est produite : ' + rep.status
@@ -193,14 +213,12 @@ function resetData() {
 function envoi() {
   if (action.value === 'reset') {
     if (actionReset.value === 'mail') {
-      typeOfReset.value = 'MAIL'
-      messageSms.value = true
-      resetData()
+      actionInitReset(0)
     }
     if (actionReset.value === 'sms') {
       typeOfReset.value = 'SMS'
       messageSms.value = true
-      resetData()
+      actionInitReset(1)
     }
   }
   if (action.value === 'change') {
@@ -243,10 +261,80 @@ function envoi() {
   }
 }
 
-function actionResetRenit() {
-  username.value = ''
-}
+function actionInitReset(resetType) {
+  //demande de reinit
+  const requestOptions = {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({uid: username.value,type:resetType})
+  }
+  if (resetType === 0){
+    typeOfReset.value='mail'
+  }else{
+    typeOfReset.value='SMS'
+  }
 
+  loading.value = true
+  enableValidation.value = false
+  fetch('/management/passwd/initreset', requestOptions)
+      .then(async response => {
+        const isJson = response.headers.get('content-type')?.includes('application/json');
+        const data = isJson && await response.json();
+        console.log('status :' + data.status)
+        // check for error response
+        if (response.status === 200){
+          resetToken.value=data.token
+          messageSms.value=true
+        } else{
+          messageAction.value = 'reloadPage'
+          messageText.value = 'Une erreur c est produite : ' + error
+          messageType.value = 'bg-negative'
+          message.value = true
+        }
+      })
+      .catch(error => {
+        messageAction.value = 'reloadPage'
+        messageText.value = 'Une erreur c est produite : ' + error
+        messageType.value = 'bg-negative'
+        message.value = true
+        console.error('There was an error!', error);
+      })
+
+}
+function actionSendReset(){
+  const requestOptions = {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({token: resetToken.value,
+      code:parseInt(code.value),
+      newpassword: newpassword.value})
+  }
+  fetch('/management/passwd/resetbycode', requestOptions)
+      .then(async response => {
+        const isJson = response.headers.get('content-type')?.includes('application/json');
+        const data = isJson && await response.json();
+        console.log('status :' + data.status)
+        // check for error response
+        if (response.status === 200){
+          messageAction.value='redirect'
+          messageText.value = 'Votre mot de passe a été reinitialisé'
+          messageType.value = 'positive'
+          message.value = true
+        } else{
+          messageAction.value = 'reloadPage'
+          messageText.value = 'Une erreur c\'est produite : ' + error
+          messageType.value = 'bg-negative'
+          message.value = true
+        }
+      })
+      .catch(error => {
+        messageAction.value = 'reloadPage'
+        messageText.value = 'Une erreur c est produite : ' + error
+        messageType.value = 'bg-negative'
+        message.value = true
+        console.error('There was an error!', error);
+      })
+}
 function doActionMessage() {
   if (messageAction.value === 'reloadPage') {
     window.location.reload()

@@ -7,7 +7,7 @@ export default defineNuxtConfig({
   proxy: {
     https: false,
     proxies: {
-      '/management': {
+      '/management/passwd': {
         target: process.env.API_URL,
         changeOrigin: true,
         headers: {Authorization: 'Bearer ' + process.env.API_KEY},

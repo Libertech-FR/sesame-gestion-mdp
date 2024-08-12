@@ -8,7 +8,8 @@
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
-    "start:prod": "node start.mjs"
+    "start:prod": "node start.mjs",
+    "start": "node .output/server/index.mjs"
   },
   "dependencies": {
     "@nuxt-alt/proxy": "^2.5.8",

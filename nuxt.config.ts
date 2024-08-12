@@ -28,7 +28,21 @@ export default defineNuxtConfig({
           { label: 'OK', color: 'yellow', handler: () => { /* ... */ } }
         ]
 
+      },
+      brand: {
+        primary: process.env.COLOR_PRIMARY || '#1976d2',
+        secondary: process.env.COLOR_SECONDARY || '#26A69A',
+        accent: process.env.COLOR_ACCENT || '#9C27B0',
+
+        dark: process.env.COLOR_DARK || '#1d1d1d',
+        'dark-page': process.env.COLOR_DARK_PAGE ||'#121212',
+
+        positive: process.env.COLOR_POSITIVE || '#21BA45',
+        negative: process.env.COLOR_NEGATIVE || '#C10015',
+        info: process.env.COLOR_INFO || '#31CCEC',
+        warning: process.env.COLOR_WARNING ||'#F2C037'
       }
+
     },
 
     // iconSet: 'material-icons', // Quasar icon set

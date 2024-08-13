@@ -1,12 +1,12 @@
 <template>
   <div>
-    <q-page class="window-height window-width row justify-center items-center">
+    <q-page class="window-height window-width row justify-center items-center bg-image">
       <q-card class="shadow-24 row" style="max-width: 800px;">
         <q-toolbar class="bg-primary text-white">
           <q-toolbar-title>Initialisation de votre compte</q-toolbar-title>
         </q-toolbar>
         <q-card-section class="col-lg-4 flex items-center mobile-hide">
-          <q-img src="/logo.png" style="max-width: 100%;width:500px;"/>
+          <q-img src="/img/logo.png" style="max-width: 100%;width:500px;"/>
         </q-card-section>
         <q-card-section class="col-lg-8  column">
           <input-new-password v-model="newpassword"
@@ -143,5 +143,10 @@ function doActionMessage() {
 </script>
 
 <style scoped>
+.bg-image {
+  background-image: url(/img/background.png);
+  background-repeat: no-repeat;
+  background-size: 100%;
+}
 
 </style>

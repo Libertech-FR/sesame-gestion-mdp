@@ -130,19 +130,21 @@ async function checkPassword(ev, type) {
       console.log('emit ' + newPassword.value)
       //avant d accepter on cherche dans l api de pwned
       try{
-        const numPwns = await pwnedPassword(newP);
+        if (props.checkPwned === true ){
+          const numPwns = await pwnedPassword(newP);
 
-        if (numPwns >0){
-          iconIsPwnedOK(false)
-          $q.notify({
-            message: '<text-weight-medium>Ce mot de passe est déjà apparu lors d\'une violation de données. Vous ne pouvez pas l\'utiliser</text-weight-medium>',
-          })
-          emit('update:modelValue', '')
-          return
-        }else{
-          iconIsPwnedOK(true)
+          if (numPwns >0){
+            iconIsPwnedOK(false)
+            $q.notify({
+              message: '<text-weight-medium>Ce mot de passe est déjà apparu lors d\'une violation de données. Vous ne pouvez pas l\'utiliser</text-weight-medium>',
+            })
+            emit('update:modelValue', '')
+            return
+          }else{
+            iconIsPwnedOK(true)
+          }
+          console.log('pwn :' + numPwns)
         }
-        console.log('pwn :' + numPwns)
       }catch(err){
 
       }
@@ -162,33 +164,41 @@ async function checkPassword(ev, type) {
 function checkPolicy(password) {
   has_len.value='highlight_off'
  let statut=true
-  if (/[!@#\$%\^\&*\)\(+=._-]/.test(password) === false){
-    pwdColor.value = 'red'
-    iconSpecialOK(false)
-    statut=false
-  }else{
-    iconSpecialOK(true)
+  if (props.minSpecial >= 1){
+    if (/[!@#\$%\^\&*\)\(+=._-]/.test(password) === false){
+      pwdColor.value = 'red'
+      iconSpecialOK(false)
+      statut=false
+    }else{
+      iconSpecialOK(true)
+    }
   }
-  if (/\d/.test(password) === false){
-    pwdColor.value = 'red'
-    iconNumberOK(false)
-    statut=false
-  }else{
-    iconNumberOK(true)
+  if (props.minNumber >= 1) {
+    if (/\d/.test(password) === false) {
+      pwdColor.value = 'red'
+      iconNumberOK(false)
+      statut = false
+    } else {
+      iconNumberOK(true)
+    }
   }
-  if (/[a-z]/.test(password) === false){
-    pwdColor.value = 'red'
-    iconLowerOK(false)
-    statut=false
-  }else{
-    iconLowerOK(true)
+  if (props.minLower >= 1) {
+    if (/[a-z]/.test(password) === false) {
+      pwdColor.value = 'red'
+      iconLowerOK(false)
+      statut = false
+    } else {
+      iconLowerOK(true)
+    }
   }
-  if (/[A-Z]/.test(password) === false){
-    pwdColor.value = 'red'
-    iconUpperOK(false)
-    statut=false
-  }else{
-    iconUpperOK(true)
+  if (props.minUpper >= 1) {
+    if (/[A-Z]/.test(password) === false) {
+      pwdColor.value = 'red'
+      iconUpperOK(false)
+      statut = false
+    } else {
+      iconUpperOK(true)
+    }
   }
   if (password.length < props.min) {
     console.log('trop court ' + props.min)
@@ -277,27 +287,23 @@ function iconIsPwnedOK(value){
 }
 function complexity(password){
   console.log(stringEntropy(password))
-  if (props.checkPwned === true){
-    let c=stringEntropy(password)
-    progress.value=c/100
+  if (props.minEntropy > 0){
+    let c = stringEntropy(password)
+    progress.value = c / 100
     console.log('entropy' + c)
-    if (c < props.entropyBad){
-      progress_color.value='red'
-    }else if(c >=props.entropyBad && c< props.entropyGood){
-      progress_color.value='warning'
-    }else {
-      progress_color.value='green'
+    if (c < props.entropyBad) {
+      progress_color.value = 'red'
+    } else if (c >= props.entropyBad && c < props.entropyGood) {
+      progress_color.value = 'warning'
+    } else {
+      progress_color.value = 'green'
     }
-    if (c >= props.minEntropy){
+    if (c >= props.minEntropy) {
       return true
-    }else{
+    } else {
       return false
     }
-  }else{
-    return true
   }
-
-
 }
 function togglePassword(){
   if (typePasswordProp.value === 'password'){

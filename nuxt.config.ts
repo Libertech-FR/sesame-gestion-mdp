@@ -11,7 +11,7 @@ export default defineNuxtConfig({
         target: process.env.API_URL,
         changeOrigin: true,
         headers: {Authorization: 'Bearer ' + process.env.API_KEY},
-
+        secure: false,
       }
     },
     cors: false

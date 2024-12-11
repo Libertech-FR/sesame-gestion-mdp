@@ -10,6 +10,7 @@ export default defineNuxtConfig({
       '/management/passwd': {
         target: process.env.API_URL,
         changeOrigin: true,
+        changeHost: true,
         headers: {Authorization: 'Bearer ' + process.env.API_KEY},
         secure: false,
       }

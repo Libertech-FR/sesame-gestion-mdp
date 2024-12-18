@@ -1,4 +1,4 @@
-FROM node:20-bookworm-slim
+FROM node:22-bookworm-slim
 
 ARG NODE_ENV=production
 ENV NODE_ENV=${NODE_ENV}

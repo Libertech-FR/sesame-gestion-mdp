@@ -1,8 +1,24 @@
+let https = {}
+if (/yes|1|on|true/i.test(`${process.env.SESAME_HTTPS_ENABLED}`)) {
+  try {
+    https = {
+      key: readFileSync(`${process.env.SESAME_HTTPS_PATH_KEY}`, 'utf8'),
+      cert: readFileSync(`${process.env.SESAME_HTTPS_PATH_CERT}`, 'utf8'),
+    };
+    consola.info('[Nuxt] SSL certificates loaded successfully')
+  } catch (error) {
+    consola.warn('[Nuxt] Error while reading SSL certificates', error)
+  }
+}
+
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   compatibilityDate: '2024-04-03',
   devtools: { enabled: true },
   modules: ["nuxt-quasar-ui","@nuxt-alt/proxy"],
+  devServer: {
+    https,
+  },
   srcDir: "src",
   proxy: {
     https: false,

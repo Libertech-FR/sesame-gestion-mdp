@@ -1,3 +1,6 @@
+import { readFileSync, writeFileSync } from 'fs'
+import consola from 'consola'
+
 let https = {}
 if (/yes|1|on|true/i.test(`${process.env.SESAME_HTTPS_ENABLED}`)) {
   try {

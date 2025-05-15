@@ -1,23 +1,25 @@
 <template>
 
-  <q-card class="shadow-24 row" style="max-width: 800px;">
+  <q-card class="shadow-24 row q-py-auto" style="max-width: 800px;">
     <q-toolbar class="bg-primary text-white">
       <q-toolbar-title>Gestion de votre accès</q-toolbar-title>
     </q-toolbar>
     <q-card-section class="col-lg-4 flex items-center mobile-hide">
       <q-img src="/img/logo.png" style="max-width: 100%;width:500px;"/>
     </q-card-section>
-    <q-card-section class="col-ms-8  column">
-      <div class="q-pa-md row-md">
+    <q-card-section class="col-lg-8  column">
+      <div class="q-pa-md row-md" v-show="action !=='menu' && withMenu ===false">
         <q-btn-toggle
             v-model="action"
             @click="resetData()"
             spread
+            push
+            glossy
             no-caps
             rounded
             unelevated
             toggle-color="primary"
-            color="white"
+            color="blue-grey-1"
             text-color="primary"
             :options="[
           {label: 'Changer votre mot de passe', value: 'change'},
@@ -25,8 +27,21 @@
         ]"
         />
       </div>
+        <div class="q-pa-md row-md " v-show="action ==='menu'">
+
+          <q-btn @click='onmenuChange()' class="q-py-sm fit glossy"  color="primary">Changer mon mot de passe</q-btn>
+          <q-separator class="q-mt-sm q-mb-sm" />
+          <q-btn @click='onmenuReset()' class="q-py-sm fit glossy"  color="primary">J'ai oublié mon mot de passe</q-btn>
+      </div>
+
+
+
+
+
+
+
       <div v-show="action == 'change'" class="row-md">
-        <q-input v-model="username" label="Utilisateur" type="text"></q-input>
+        <q-input v-model="username" :label="userLabel" type="text"></q-input>
         <q-input v-model="oldpassword" label="Mot de passe" type="password"></q-input>
         <input-new-password v-model="newpassword"
                             :min="passwordPolicies.len"
@@ -48,6 +63,8 @@
               @click="actionResetRenit()"
               v-model="actionReset"
               spread
+              push
+              glossy
               no-caps
               rounded
               unelevated
@@ -57,11 +74,11 @@
               :options="optionsReset()"
           />
         </div>
-        <q-input v-model="username" label="Utilisateur" type="text"></q-input>
+        <q-input v-model="username" :label="userLabel" type="text"></q-input>
       </div>
-      <div v-show="action !== ''" class="row-md" style="margin-top: 30px;">
-
-        <q-btn @click="envoi" :loading="loading" color="primary" style="width:100%" :disabled="enableValidation">Validez
+      <div v-show="action !== '' && action !== 'menu'" class="row-md" style="margin-top: 30px;">
+        <q-btn v-show="withMenu===true" @click="action='menu'"  color="negative" :style="getButtonsWidth()" >Abandonner</q-btn>
+        <q-btn @click="envoi" :loading="loading" color="primary" :style="getButtonsWidth()" :disabled="enableValidation">Validez
         </q-btn>
       </div>
     </q-card-section>
@@ -109,7 +126,7 @@
         </input-new-password>
 
       </q-card-section>
-      <q-card-actions align="right" class="text-primary">
+      <q-card-actions align="right" class="text-primary"  >
         <q-btn @click="doReloadPage" flat label="Abandonner" v-close-popup/>
         <q-btn @click="actionSendReset" flat label="Valider" v-close-popup :disabled="enableValidationCode"/>
       </q-card-actions>
@@ -120,15 +137,16 @@
 <script setup>
 import {ref} from 'vue'
 import {computed, onMounted} from 'vue';
-
-
+const config = useAppConfig()
+const userLabel=ref(config.userLabel)
 const messageType = ref('bg-secondary')
 const messageText = ref('')
 const messageSms = ref(false)
 const messageAction = ref('reloadPage')
 const message = ref(false)
 const loading = ref(false)
-const action = ref('change')
+const action = ref(config.action)
+const withMenu=ref(false)
 const username = ref('')
 const oldpassword = ref('')
 const newpassword = ref('')
@@ -210,7 +228,21 @@ function resetData() {
   newpassword.value = ''
 
 }
-
+function getButtonsWidth(){
+  if (withMenu.value === true){
+    return "width: 50%;"
+  }else{
+    return "width: 100%;"
+  }
+}
+function onmenuChange(){
+  action.value='change'
+  withMenu.value=true
+}
+function onmenuReset(){
+  action.value='reset'
+  withMenu.value=true
+}
 function envoi() {
   if (action.value === 'reset') {
     if (actionReset.value === 'mail') {

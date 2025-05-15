@@ -23,6 +23,10 @@ export default defineNuxtConfig({
     https,
   },
   srcDir: "src",
+  appConfig: {
+    action: process.env.ACTION || 'change',
+    userLabel: process.env.USER_LABEL || 'Utilisateur'
+  },
   proxy: {
     https: false,
     proxies: {

@@ -4,12 +4,19 @@
   "type": "module",
   "scripts": {
     "build": "nuxt build",
-    "dev": "nuxt dev",
+    "dev": "nuxt dev --host 0.0.0.0",
+    "lint": "yarn nuxt prepare",
+    "test:unit": "yarn vitest run",
+    "test": "yarn lint && yarn test:unit",
+    "ci": "yarn test && yarn build",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "start:prod": "node start.mjs",
     "start": "node .output/server/index.mjs"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.4"
   },
   "dependencies": {
     "@nuxt-alt/proxy": "^2.5.8",

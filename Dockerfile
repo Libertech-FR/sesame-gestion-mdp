@@ -24,15 +24,16 @@ RUN apt-get update && apt-get -y --no-install-recommends upgrade && apt-get inst
 
 COPY . .
 
+# Pas de --frozen-lockfile : le yarn.lock est synchronisé depuis le dépôt après « make exec » puis « yarn install » (bind-mount).
 RUN yarn install \
   --prefer-offline \
-  --frozen-lockfile \
   --non-interactive \
   --production=false
 # && yarn cache clean \
 # && yarn autoclean --init \
 # && yarn autoclean --force
 
+RUN yarn test
 RUN yarn build
 
 EXPOSE 3000

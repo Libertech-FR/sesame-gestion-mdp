@@ -1,5 +1,7 @@
 node_modules
 .nuxt
+.idea/
 .env
 .DS_Store
 src/components/.DS_Store
+.output/

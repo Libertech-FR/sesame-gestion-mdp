@@ -5,3 +5,6 @@ node_modules
 .DS_Store
 src/components/.DS_Store
 .output/
+test-results/
+playwright-report/
+playwright/.cache/

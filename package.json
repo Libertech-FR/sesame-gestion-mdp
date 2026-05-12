@@ -7,7 +7,11 @@
     "dev": "nuxt dev --host 0.0.0.0",
     "lint": "yarn nuxt prepare",
     "test:unit": "yarn vitest run",
-    "test": "yarn lint && yarn test:unit",
+    "playwright:install-deps": "playwright install-deps chromium",
+    "playwright:install-chromium": "playwright install chromium",
+    "playwright:install": "playwright install --with-deps chromium",
+    "test:e2e": "playwright test",
+    "test": "yarn lint && yarn test:unit && yarn test:e2e",
     "ci": "yarn test && yarn build",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
@@ -16,6 +20,7 @@
     "start": "node .output/server/index.mjs"
   },
   "devDependencies": {
+    "@playwright/test": "^1.51.1",
     "vitest": "^3.2.4"
   },
   "dependencies": {

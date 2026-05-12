@@ -8,9 +8,12 @@ IMG_NAME = ghcr.io/libertech-fr/sesame-gestion-mdp
 BASE_NAME = sesame
 APP_NAME = sesame-gestion-mdp
 # Volume dédié : évite de monter les node_modules du mac dans le conteneur Linux.
-# Flux : pas de yarn install sur le Mac — make exec puis yarn install / yarn add (lockfile + package.json sur l’hôte via le montage).
-# Puis make build | make dev | make test (Vitest) | make verify (tests + build Nuxt).
+# Réseau Docker « dev » : créer une fois (make network-dev ou docker network create dev).
+# Flux : pas de yarn sur le Mac — make exec puis yarn install ; e2e / CI : docker dans .github/workflows/lint.yml.
+# Chaque « make test » / « verify » : nouveau conteneur → yarn playwright:install-deps puis tests (prérequis : node_modules + cache Playwright remplis, ex. étapes du workflow ou exec).
 NODE_MODULES_VOLUME = sesame-gestion-mdp-node-modules
+# Cache Chromium Playwright (Linux) entre les « make exec » — pas sur le Mac.
+PLAYWRIGHT_CACHE_VOLUME = sesame-gestion-mdp-playwright-cache
 
 -include .env
 
@@ -33,7 +36,7 @@ SESAME_SENTRY_DSN ?=
 $(shell mkdir -p $(CERT_DIR))
 
 .PHONY: network-dev
-network-dev: ## Créer le réseau Docker « dev » s’il n’existe pas
+network-dev: ## Créer le réseau Docker « dev » s’il n’existe pas (à lancer une fois après install machine)
 	@docker network inspect dev >/dev/null 2>&1 || docker network create dev
 
 .DEFAULT_GOAL := help
@@ -42,7 +45,7 @@ help:
 	@grep -h -E '^[-a-zA-Z0-9_\.\/]+:.*?## .*$$' $(MAKEFILE_LIST) \
 		| sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[32m%-18s\033[0m %s\n", $$1, $$2}'
 
-build: ## Image Docker (Dockerfile : yarn test puis yarn build ; pas de tests dans le script build)
+build: ## Image Docker (yarn build dans l’image ; pas de Playwright dans l’image — voir workflow GitHub)
 	@docker build --platform $(PLATFORM) -t $(IMG_NAME) --no-cache --progress=plain \
 		--build-arg BUILD_VERSION=$(DOCKER_TAG) \
 		--build-arg GIT_BRANCH=$(GIT_BRANCH) \
@@ -51,7 +54,7 @@ build: ## Image Docker (Dockerfile : yarn test puis yarn build ; pas de tests da
 		.
 
 # Mode « simulation » : image déjà buildée, env + certificats montés (sans écraser tout le code par le bind-mount complet)
-simulation: network-dev ## Lancer en NODE_ENV=production avec montages ciblés (.env, certificats, hash)
+simulation: ## Lancer en NODE_ENV=production avec montages ciblés (.env, certificats, hash)
 	@touch $(CURDIR)/.env.hash
 	@docker run --rm -it \
 		-e NODE_ENV=production \
@@ -71,7 +74,7 @@ simulation: network-dev ## Lancer en NODE_ENV=production avec montages ciblés (
 		-v $(CURDIR)/.env.hash:/data/.env.hash \
 		$(IMG_NAME) yarn start:prod
 
-prod: network-dev ## Production : bind-mount du dépôt sur /data
+prod: ## Production : bind-mount du dépôt sur /data
 	@docker run --rm -it \
 		-e NODE_ENV=production \
 		-e NODE_TLS_REJECT_UNAUTHORIZED=0 \
@@ -88,7 +91,7 @@ prod: network-dev ## Production : bind-mount du dépôt sur /data
 		-v $(CURDIR):/data \
 		$(IMG_NAME) yarn start:prod
 
-dev: network-dev ## Développement : nuxt dev (deps : make exec → yarn install / yarn add)
+dev: ## Développement : nuxt dev (premier lancement : make network-dev, make exec → yarn install)
 	@docker run --rm -it \
 		-e NODE_ENV=development \
 		-e NODE_TLS_REJECT_UNAUTHORIZED=0 \
@@ -106,7 +109,7 @@ dev: network-dev ## Développement : nuxt dev (deps : make exec → yarn install
 		-v $(NODE_MODULES_VOLUME):/data/node_modules \
 		$(IMG_NAME) yarn dev
 
-debug: network-dev ## Idem dev + inspecteur Node (9229) ; deps via make exec → yarn install / yarn add
+debug: ## Idem dev + inspecteur Node (9229)
 	@docker run --rm -it \
 		-e NODE_ENV=development \
 		-e NODE_TLS_REJECT_UNAUTHORIZED=0 \
@@ -126,7 +129,7 @@ debug: network-dev ## Idem dev + inspecteur Node (9229) ; deps via make exec →
 		-v $(NODE_MODULES_VOLUME):/data/node_modules \
 		$(IMG_NAME) sh -lc 'NODE_OPTIONS="--inspect=0.0.0.0:9229" yarn dev'
 
-exec: network-dev ## Shell : yarn install, yarn add [-D] <pkg>, yarn remove… (package.json / lock sur l’hôte ; node_modules dans le volume)
+exec: ## Shell interactif (yarn install, yarn add, …)
 	@docker run -it --rm \
 		-e NODE_ENV=development \
 		-e NODE_TLS_REJECT_UNAUTHORIZED=0 \
@@ -136,6 +139,7 @@ exec: network-dev ## Shell : yarn install, yarn add [-D] <pkg>, yarn remove… (
 		-e SESAME_SENTRY_DSN=$(SESAME_SENTRY_DSN) \
 		-v $(CURDIR):/data \
 		-v $(NODE_MODULES_VOLUME):/data/node_modules \
+		-v $(PLAYWRIGHT_CACHE_VOLUME):/root/.cache/ms-playwright \
 		$(IMG_NAME) bash
 
 stop: ## Arrêter le conteneur applicatif
@@ -147,27 +151,41 @@ stop-all: ## Arrêter le conteneur applicatif (équivalent ici, pas de stack BDD
 run-lint: ## Rejouer le job GitHub Actions « lint-app » avec act (nécessite nektos/act)
 	act --container-architecture=linux/amd64 -j lint-app
 
-test: network-dev ## Tests : nuxt prepare + Vitest (pas de build Nuxt — voir make verify)
+test: ## Tests : paquets système Chromium puis prepare + Vitest + E2E (yarn install + Chromium : voir lint.yml)
 	@docker run --rm \
+		-u 0 \
+		-e CI=1 \
 		-e NODE_ENV=development \
 		-e NODE_TLS_REJECT_UNAUTHORIZED=0 \
+		-e DEBIAN_FRONTEND=noninteractive \
+		-e SESAME_HTTPS_ENABLED=false \
+		-e BROWSERSLIST_IGNORE_OLD_DATA=1 \
+		-e PLAYWRIGHT_BASE_URL=http://127.0.0.1:3000 \
 		--platform $(PLATFORM) \
 		--network dev \
 		-v $(CURDIR):/data \
 		-v $(NODE_MODULES_VOLUME):/data/node_modules \
+		-v $(PLAYWRIGHT_CACHE_VOLUME):/root/.cache/ms-playwright \
 		-w /data \
 		$(IMG_NAME) yarn test
 
-verify: network-dev ## CI locale : yarn test puis yarn build (comme le workflow GitHub)
+verify: ## CI locale : paquets système Chromium puis yarn ci (même prérequis que test)
 	@docker run --rm \
+		-u 0 \
+		-e CI=1 \
 		-e NODE_ENV=development \
 		-e NODE_TLS_REJECT_UNAUTHORIZED=0 \
+		-e DEBIAN_FRONTEND=noninteractive \
+		-e SESAME_HTTPS_ENABLED=false \
+		-e BROWSERSLIST_IGNORE_OLD_DATA=1 \
+		-e PLAYWRIGHT_BASE_URL=http://127.0.0.1:3000 \
 		--platform $(PLATFORM) \
 		--network dev \
 		-v $(CURDIR):/data \
 		-v $(NODE_MODULES_VOLUME):/data/node_modules \
+		-v $(PLAYWRIGHT_CACHE_VOLUME):/root/.cache/ms-playwright \
 		-w /data \
-		$(IMG_NAME) sh -lc 'yarn test && yarn build'
+		$(IMG_NAME) yarn ci
 
 ncu: ## Vérifier les mises à jour des dépendances
 	@npx npm-check-updates
@@ -200,3 +218,4 @@ hibp-key-hex: ## Générer une clé 32 octets (64 caractères hex)
 
 hibp-key-b64: ## Générer une clé 32 octets (base64)
 	@printf "SESAME_PASSWORD_HISTORY_HIBP_KEY=%s\n" "$$(openssl rand -base64 32)"
+

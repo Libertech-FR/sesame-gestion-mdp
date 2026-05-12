@@ -5,19 +5,53 @@ on:
     branches:
       - '*'
 
+env:
+  CI_IMG: ghcr.io/libertech-fr/sesame-gestion-mdp
+  NODE_MODULES_VOL: sesame-gestion-mdp-node-modules
+  PLAYWRIGHT_CACHE_VOL: sesame-gestion-mdp-playwright-cache
+
 jobs:
   lint-app:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
-      - name: Install app dependencies
-        run: yarn install
+      - name: Réseau Docker dev
+        run: docker network create dev || true
 
-      - name: Tests
-        run: yarn test
+      - name: Dépendances + Chromium Playwright (dans Docker)
+        run: |
+          docker run --rm \
+            -u 0 \
+            -e NODE_ENV=development \
+            -e NODE_TLS_REJECT_UNAUTHORIZED=0 \
+            -e DEBIAN_FRONTEND=noninteractive \
+            --add-host host.docker.internal:host-gateway \
+            --platform linux/amd64 \
+            --network dev \
+            -v "${GITHUB_WORKSPACE}:/data" \
+            -v "${NODE_MODULES_VOL}:/data/node_modules" \
+            -v "${PLAYWRIGHT_CACHE_VOL}:/root/.cache/ms-playwright" \
+            -w /data \
+            "${CI_IMG}" sh -lc 'yarn install --prefer-offline --non-interactive && yarn playwright:install-chromium'
 
-      - name: Build Nuxt
-        run: yarn build
+      - name: Tests + build (yarn ci dans Docker)
+        run: |
+          docker run --rm \
+            -u 0 \
+            -e CI=1 \
+            -e NODE_ENV=development \
+            -e NODE_TLS_REJECT_UNAUTHORIZED=0 \
+            -e DEBIAN_FRONTEND=noninteractive \
+            -e SESAME_HTTPS_ENABLED=false \
+            -e BROWSERSLIST_IGNORE_OLD_DATA=1 \
+            -e PLAYWRIGHT_BASE_URL=http://127.0.0.1:3000 \
+            --platform linux/amd64 \
+            --network dev \
+            -v "${GITHUB_WORKSPACE}:/data" \
+            -v "${NODE_MODULES_VOL}:/data/node_modules" \
+            -v "${PLAYWRIGHT_CACHE_VOL}:/root/.cache/ms-playwright" \
+            -w /data \
+            "${CI_IMG}" sh -lc 'yarn playwright:install-deps && yarn ci'

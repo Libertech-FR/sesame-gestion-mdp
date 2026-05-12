@@ -33,7 +33,6 @@ RUN yarn install \
 # && yarn autoclean --init \
 # && yarn autoclean --force
 
-RUN yarn test
 RUN yarn build
 
 EXPOSE 3000

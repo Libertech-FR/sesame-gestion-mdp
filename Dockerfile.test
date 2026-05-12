@@ -1,0 +1,16 @@
+# Image de test : image app Alpine + Chromium (apk) + devDependencies pour Playwright.
+ARG BASE_IMAGE=ghcr.io/libertech-fr/sesame-gestion-mdp
+FROM ${BASE_IMAGE}
+
+USER root
+
+RUN apk add --no-cache chromium
+
+WORKDIR /data
+
+COPY playwright.config.ts /data/playwright.config.ts
+
+RUN yarn install --frozen-lockfile --production=false --non-interactive
+
+ENV NODE_ENV=development
+ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium

@@ -5,14 +5,14 @@ APP_WEB_PORT_SECURE = 3443
 APP_WEB_DEBUG_PORT = 24678
 
 IMG_NAME = ghcr.io/libertech-fr/sesame-gestion-mdp
+TEST_IMG_NAME = sesame-gestion-mdp-test-local
 BASE_NAME = sesame
 APP_NAME = sesame-gestion-mdp
 # Volume dédié : évite de monter les node_modules du mac dans le conteneur Linux.
 # Réseau Docker « dev » : créer une fois (make network-dev ou docker network create dev).
-# Flux : pas de yarn sur le Mac — make exec puis yarn install ; e2e / CI : docker dans .github/workflows/lint.yml.
-# Chaque « make test » / « verify » : nouveau conteneur → yarn playwright:install-deps puis tests (prérequis : node_modules + cache Playwright remplis, ex. étapes du workflow ou exec).
+# Flux : pas de yarn sur le Mac — make exec puis yarn install ; PR : .github/workflows/lint.yml ; push main (chemins filtrés) : docker-image.yml ; tests e2e locaux : make build && make test (image test basée sur $(IMG_NAME)).
 NODE_MODULES_VOLUME = sesame-gestion-mdp-node-modules
-# Cache Chromium Playwright (Linux) entre les « make exec » — pas sur le Mac.
+# Cache Playwright (binaires téléchargés) pour « make exec » ; make test / verify utilisent Chromium système Alpine (pas ce volume).
 PLAYWRIGHT_CACHE_VOLUME = sesame-gestion-mdp-playwright-cache
 
 -include .env
@@ -45,13 +45,18 @@ help:
 	@grep -h -E '^[-a-zA-Z0-9_\.\/]+:.*?## .*$$' $(MAKEFILE_LIST) \
 		| sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[32m%-18s\033[0m %s\n", $$1, $$2}'
 
-build: ## Image Docker (yarn build dans l’image ; pas de Playwright dans l’image — voir workflow GitHub)
+build: ## Image Docker (Alpine multi-stage ; pas de Playwright — voir Dockerfile.test et workflows)
 	@docker build --platform $(PLATFORM) -t $(IMG_NAME) --no-cache --progress=plain \
 		--build-arg BUILD_VERSION=$(DOCKER_TAG) \
 		--build-arg GIT_BRANCH=$(GIT_BRANCH) \
 		--build-arg GIT_COMMIT=$(GIT_COMMIT) \
 		--build-arg DOCKER_TAG=$(DOCKER_TAG) \
 		.
+
+build-test-image: ## Image locale dédiée aux tests (FROM $(IMG_NAME) + Chromium + devDependencies)
+	@docker build --platform $(PLATFORM) -f Dockerfile.test \
+		--build-arg BASE_IMAGE=$(IMG_NAME) \
+		-t $(TEST_IMG_NAME) .
 
 # Mode « simulation » : image déjà buildée, env + certificats montés (sans écraser tout le code par le bind-mount complet)
 simulation: ## Lancer en NODE_ENV=production avec montages ciblés (.env, certificats, hash)
@@ -151,41 +156,39 @@ stop-all: ## Arrêter le conteneur applicatif (équivalent ici, pas de stack BDD
 run-lint: ## Rejouer le job GitHub Actions « lint-app » avec act (nécessite nektos/act)
 	act --container-architecture=linux/amd64 -j lint-app
 
-test: ## Tests : paquets système Chromium puis prepare + Vitest + E2E (yarn install + Chromium : voir lint.yml)
+test: build-test-image ## Vitest + Playwright dans l’image test (prérequis : make build pour taguer $(IMG_NAME) en local)
 	@docker run --rm \
 		-u 0 \
 		-e CI=1 \
 		-e NODE_ENV=development \
 		-e NODE_TLS_REJECT_UNAUTHORIZED=0 \
-		-e DEBIAN_FRONTEND=noninteractive \
 		-e SESAME_HTTPS_ENABLED=false \
 		-e BROWSERSLIST_IGNORE_OLD_DATA=1 \
 		-e PLAYWRIGHT_BASE_URL=http://127.0.0.1:3000 \
+		-e PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium \
 		--platform $(PLATFORM) \
 		--network dev \
-		-v $(CURDIR):/data \
-		-v $(NODE_MODULES_VOLUME):/data/node_modules \
-		-v $(PLAYWRIGHT_CACHE_VOLUME):/root/.cache/ms-playwright \
+		-v $(CURDIR)/playwright.config.ts:/data/playwright.config.ts \
+		-v $(CURDIR)/tests:/data/tests \
 		-w /data \
-		$(IMG_NAME) yarn test
+		$(TEST_IMG_NAME) sh -lc 'yarn test'
 
-verify: ## CI locale : paquets système Chromium puis yarn ci (même prérequis que test)
+verify: build-test-image ## CI locale : yarn ci dans l’image test (lint + unit + e2e + build)
 	@docker run --rm \
 		-u 0 \
 		-e CI=1 \
 		-e NODE_ENV=development \
 		-e NODE_TLS_REJECT_UNAUTHORIZED=0 \
-		-e DEBIAN_FRONTEND=noninteractive \
 		-e SESAME_HTTPS_ENABLED=false \
 		-e BROWSERSLIST_IGNORE_OLD_DATA=1 \
 		-e PLAYWRIGHT_BASE_URL=http://127.0.0.1:3000 \
+		-e PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium \
 		--platform $(PLATFORM) \
 		--network dev \
-		-v $(CURDIR):/data \
-		-v $(NODE_MODULES_VOLUME):/data/node_modules \
-		-v $(PLAYWRIGHT_CACHE_VOLUME):/root/.cache/ms-playwright \
+		-v $(CURDIR)/playwright.config.ts:/data/playwright.config.ts \
+		-v $(CURDIR)/tests:/data/tests \
 		-w /data \
-		$(IMG_NAME) yarn ci
+		$(TEST_IMG_NAME) sh -lc 'yarn ci'
 
 ncu: ## Vérifier les mises à jour des dépendances
 	@npx npm-check-updates

@@ -1,0 +1,12 @@
+.git
+.github
+node_modules
+.nuxt
+.output
+test-results
+playwright-report
+*.md
+.env
+.env.*
+!.env.exemple
+certificates

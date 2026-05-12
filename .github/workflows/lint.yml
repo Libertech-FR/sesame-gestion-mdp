@@ -6,9 +6,9 @@ on:
       - '*'
 
 env:
-  CI_IMG: ghcr.io/libertech-fr/sesame-gestion-mdp
+  APP_CI_IMG: sesame-gestion-mdp:ci
+  TEST_CI_IMG: sesame-gestion-mdp:ci-test
   NODE_MODULES_VOL: sesame-gestion-mdp-node-modules
-  PLAYWRIGHT_CACHE_VOL: sesame-gestion-mdp-playwright-cache
 
 jobs:
   lint-app:
@@ -21,37 +21,41 @@ jobs:
       - name: Réseau Docker dev
         run: docker network create dev || true
 
-      - name: Dépendances + Chromium Playwright (dans Docker)
+      - name: Images Docker (app Alpine + test avec Chromium)
+        run: |
+          docker build -t "${APP_CI_IMG}" .
+          docker build -f Dockerfile.test --build-arg BASE_IMAGE="${APP_CI_IMG}" -t "${TEST_CI_IMG}" .
+
+      - name: Dépendances (yarn install dans l’image de test)
         run: |
           docker run --rm \
             -u 0 \
             -e NODE_ENV=development \
             -e NODE_TLS_REJECT_UNAUTHORIZED=0 \
-            -e DEBIAN_FRONTEND=noninteractive \
             --add-host host.docker.internal:host-gateway \
             --platform linux/amd64 \
             --network dev \
             -v "${GITHUB_WORKSPACE}:/data" \
             -v "${NODE_MODULES_VOL}:/data/node_modules" \
-            -v "${PLAYWRIGHT_CACHE_VOL}:/root/.cache/ms-playwright" \
             -w /data \
-            "${CI_IMG}" sh -lc 'yarn install --prefer-offline --non-interactive && yarn playwright:install-chromium'
+            "${TEST_CI_IMG}" \
+            sh -lc 'yarn install --prefer-offline --non-interactive'
 
-      - name: Tests + build (yarn ci dans Docker)
+      - name: Tests + build (yarn ci)
         run: |
           docker run --rm \
             -u 0 \
             -e CI=1 \
             -e NODE_ENV=development \
             -e NODE_TLS_REJECT_UNAUTHORIZED=0 \
-            -e DEBIAN_FRONTEND=noninteractive \
             -e SESAME_HTTPS_ENABLED=false \
             -e BROWSERSLIST_IGNORE_OLD_DATA=1 \
             -e PLAYWRIGHT_BASE_URL=http://127.0.0.1:3000 \
+            -e PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium \
             --platform linux/amd64 \
             --network dev \
             -v "${GITHUB_WORKSPACE}:/data" \
             -v "${NODE_MODULES_VOL}:/data/node_modules" \
-            -v "${PLAYWRIGHT_CACHE_VOL}:/root/.cache/ms-playwright" \
             -w /data \
-            "${CI_IMG}" sh -lc 'yarn playwright:install-deps && yarn ci'
+            "${TEST_CI_IMG}" \
+            sh -lc 'yarn ci'

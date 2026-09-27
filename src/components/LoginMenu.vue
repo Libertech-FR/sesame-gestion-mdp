@@ -53,8 +53,10 @@
                             :entropy-bad="passwordPolicies.minComplexity"
                             :entropy-good="passwordPolicies.goodComplexity"
                             :check-pwned="passwordPolicies.checkPwned"
+                            :password-history-enabled="passwordPolicies.passwordHistoryEnabled"
+                            :uid="username"
+                            :old-password="oldpassword"
         >
-
         </input-new-password>
       </div>
       <div v-show="action == 'reset'" class="row-md">
@@ -121,6 +123,8 @@
                             :entropy-bad="passwordPolicies.minComplexity"
                             :entropy-good="passwordPolicies.goodComplexity"
                             :check-pwned="passwordPolicies.checkPwned"
+                            :password-history-enabled="passwordPolicies.passwordHistoryEnabled"
+                            :token="resetToken"
         >
 
         </input-new-password>

@@ -48,6 +48,7 @@ export default defineNuxtConfig({
   },
   devServer: {
     https: devHttps,
+    port: process.env.PORT || 3000,
   },
   srcDir: "src",
   appConfig: {

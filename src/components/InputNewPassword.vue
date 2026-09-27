@@ -36,12 +36,17 @@
         <q-icon  :name="has_special" :color="has_special_color" size="xs" ></q-icon>
         &nbsp;doit comporter au moins {{minNumber}} charactère special
       </p>
+      <p v-show="passwordHistoryEnabled" style="margin: 0px;">
+        <q-icon  :name="has_history" :color="has_history_color" size="xs" ></q-icon>
+        &nbsp;Le mot de passe saisi n'est pas dans votre historique
+      </p>
       <p v-show="minEntropy > 0" style="margin: 0px;">
         <q-icon  :name="has_complexity" :color="has_complexity_color" size="xs" ></q-icon>
         &nbsp; Complexité
         <br>
         <q-linear-progress :value="progress" :color="progress_color" class="q-mt-sm" size="10px" />
       </p>
+
       <p v-show="checkPwned">
         <q-icon  :name="isPwned" :color="isPwned_color" size="xs" ></q-icon>
         &nbsp; Exposition du mot de passe <a href="https://haveibeenpwned.com">haveiBeenPwned</a>
@@ -73,6 +78,8 @@ const has_special=ref('highlight_off')
 const has_special_color=ref('red')
 const has_complexity=ref('highlight_off')
 const has_complexity_color=ref('red')
+const has_history=ref('highlight_off')
+const has_history_color=ref('red')
 const isPwned=ref('sentiment_satisfied')
 const isPwned_color=ref('grey')
 const progress=ref(0)
@@ -114,9 +121,48 @@ const props = defineProps({
   checkPwned:{
     type:Boolean,
     default:true
+  },
+  passwordHistoryEnabled:{
+    type:Boolean,
+    default:false
+  },
+  token:{
+    type:String,
+    default:null
+  },
+  uid:{
+    type:String,
+    default:null
+  },
+  oldPassword:{
+    type:String,
+    default:null
   }
-})
 
+})
+async function checkHistory(newP){
+  let body
+  if (props.token){
+    body = {token: props.token, newpassword: newP}
+  }else{
+    body = {uid: props.uid, oldPassword: props.oldPassword, newpassword: newP}
+  }
+  const requestOptions = {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body)
+  }
+  console.log(requestOptions)
+  //appel de la fonction checkhistory
+  try{
+    const response = await fetch('/management/passwd/checkhistory', requestOptions)
+    console.log(response)
+    return response.status === 200
+  }catch(error){
+    console.log(error)
+    return false
+  }
+}
 async function checkPassword(ev, type) {
   let newP = newPassword.value
   let confirmP = confirmNewPassword.value
@@ -147,6 +193,17 @@ async function checkPassword(ev, type) {
         }
       }catch(err){
 
+      }
+      // check history
+      if (props.passwordHistoryEnabled === true && await checkHistory(newP) === false){
+        iconHistoryOk(false)
+        $q.notify({
+          message: '<text-weight-medium>Ce mot de passe est dans votre historique. Vous ne pouvez pas l\'utiliser de nouveau</text-weight-medium>',
+        })
+        emit('update:modelValue', '')
+        return
+      }else if (props.passwordHistoryEnabled === true){
+        iconHistoryOk(true)
       }
 
 
@@ -247,6 +304,15 @@ function iconUpperOK(value){
   }else{
     has_upper.value='highlight_off'
     has_upper_color.value='red'
+  }
+}
+function iconHistoryOk(value){
+  if (value === true){
+    has_history.value='done'
+    has_history_color.value='green'
+  }else{
+    has_history.value='highlight_off'
+    has_history_color.value='red'
   }
 }
 function iconLowerOK(value){

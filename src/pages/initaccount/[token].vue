@@ -19,6 +19,8 @@
                               :entropy-bad="passwordPolicies.minComplexity"
                               :entropy-good="passwordPolicies.goodComplexity"
                               :check-pwned="passwordPolicies.checkPwned"
+                              :password-history-enabled="passwordPolicies.passwordHistoryEnabled"
+                              :token="token"
           >
           </input-new-password>
           <q-btn @click="envoi" :loading="loading" color="primary" style="width:100%" :disabled="enableValidation">
@@ -49,9 +51,13 @@
 
 <script setup>
 import {computed, onMounted, ref} from "vue";
-import { useRoute } from 'vue-router'
 const loading = ref(false)
 const route = useRoute()
+// route.params.token peut être string | string[] : on normalise en string pour le composant
+const token = computed(() => {
+  const t = route.params.token
+  return Array.isArray(t) ? t[0] : t
+})
 const messageType = ref('bg-secondary')
 const messageText = ref('')
 const messageAction = ref('reloadPage')
@@ -99,7 +105,7 @@ function envoi() {
   const requestOptions = {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({token: route.params.token,newPassword: newpassword.value})
+    body: JSON.stringify({token: token.value,newPassword: newpassword.value})
   }
   fetch('/management/passwd/reset', requestOptions)
       .then(async response => {

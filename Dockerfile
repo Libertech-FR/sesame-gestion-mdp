@@ -1,5 +1,5 @@
 # Multi-stage Alpine (même esprit que sesame-orchestrator) : build isolé, runtime avec node_modules complet pour `start.mjs` (rebuild si `.env` change).
-FROM node:22-alpine AS builder
+FROM node:24-alpine AS builder
 
 WORKDIR /data
 
@@ -17,7 +17,7 @@ COPY . .
 
 RUN yarn build
 
-FROM node:22-alpine AS production
+FROM node:24-alpine AS production
 
 ARG NODE_ENV=production
 ARG BUILD_VERSION=dev
